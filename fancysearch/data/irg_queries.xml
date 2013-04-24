@@ -44,7 +44,8 @@
     eigenvectors by a permutation:, siam j. numerical analysis,
     vol. 7, no. 1 (1970); g.w. stewart, "error bounds for
     approximate invariant subspaces of closed linear operators",
-    siam j. numerical analysis., vol. 8, no. 4 (1971).</text>
+    siam j. numerical analysis., vol. 8, no. 4 (1971).
+    </text>
   </DOC>
   <DOC>
     <recordId>4767</recordId>
@@ -58,10 +59,10 @@
   <DOC>
     <recordId>6324</recordId>
     <text>what does type compatibility mean in languages that allow
-    programmer defined types? (you might want to restrict this to
+    programmer defined types you might want to restrict this to
     "extensible" languages that allow definition of abstract data
-    types or programmer-supplied definitions of operators like *,
-    +.)</text>
+    types or programmer-supplied definitions of operators like 
+    </text>
   </DOC>
   <DOC>
     <recordId>7328</recordId>
@@ -71,10 +72,10 @@
   <DOC>
     <recordId>8141</recordId>
     <text>articles describing the relationship between data types
-    and concurrency (e.g. what is the type of a process? when is a
-    synchronization attempt between two processes "type correct"?
+    and concurrency (e.g. what is the type of a process when is a
+    synchronization attempt between two processes "type correct"
     in a message-passing system is there any notion of the types of
-    messages?--i.e. any way to check that the sender of the message
+    messages--i.e. any way to check that the sender of the message
     and the receiver are both treating the bit stream as some
     particular type)</text>
   </DOC>

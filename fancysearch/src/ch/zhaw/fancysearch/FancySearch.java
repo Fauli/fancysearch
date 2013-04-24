@@ -37,6 +37,8 @@ public class FancySearch {
 
 	public static String[] queryNr = new String[50];
 	public static String[] queryText = new String[50];
+	public static String systemName = "fancySearch-master";
+
 
 	public static void main(String[] args) throws IOException, ParseException {
 		// 0. Specify the analyzer for tokenizing text.
@@ -61,7 +63,6 @@ public class FancySearch {
 		queryText = new String[50];
 
 		// int queryNr = 1;
-		String systemName = "fancySearch-master";
 
 		readXMLIntoQueryArrays("data/irg_queries.xml");
 
@@ -69,7 +70,7 @@ public class FancySearch {
 
 		for (int queryCounter = 0; queryCounter < 50; queryCounter++) {
 			// 2. query
-			String querystr = "transistor phase splitting circuits";
+			String querystr = queryText[queryCounter].replaceAll("\"|\\n|/n", " ");
 
 			// the "title" arg specifies the default field to use
 			// when no field is explicitly specified in the query.
