@@ -74,7 +74,7 @@ public class FancySearch_Merne {
 
 		StringBuilder sb = new StringBuilder();
 
-		for (int queryCounter = 0; queryCounter < 1; queryCounter++) {
+		for (int queryCounter = 0; queryCounter < 50; queryCounter++) {
 			// 2. query
 			String querystr = convertToSlangWords(queryText[queryCounter]
 					.replaceAll("\"|\\n|/n", " "));
