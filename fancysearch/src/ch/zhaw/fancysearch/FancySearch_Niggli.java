@@ -6,23 +6,32 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import org.apache.lucene.analysis.core.StopAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.codecs.TermStats;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.SlowCompositeReaderWrapper;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.queryparser.classic.ParseException;
@@ -50,42 +59,97 @@ public class FancySearch_Niggli {
 	public static void main(String[] args) throws IOException, ParseException {
 		// 0. Specify the analyzer for tokenizing text.
 		// The same analyzer should be used for indexing and searching
-		StandardAnalyzer analyzer = new StandardAnalyzer(Version.LUCENE_42);
+		StandardAnalyzer analyzer0 = new StandardAnalyzer(Version.LUCENE_42);
 
 		// 1. create the index
-		Directory index = new RAMDirectory();
+		Directory index0 = new RAMDirectory();
 		// Directory index = FSDirectory.open(new
 		// File("data/index/index_test1")); // disk index storage
 
-		IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_42,
-				analyzer);
+		IndexWriterConfig config0 = new IndexWriterConfig(Version.LUCENE_42,
+				analyzer0);
 
-		IndexWriter w = new IndexWriter(index, config);
+		IndexWriter w0 = new IndexWriter(index0, config0);
 
 		// read irg_collection.xml, add all documents
-		readXMLIntoIndexWriter(w, "data/irg_collection.xml");
+		readXMLIntoIndexWriter(w0, "data/irg_collection.xml");
 
-		w.close();
+		w0.close();
 
 		// Index written
 
 		// --------------------------------------------------------------------------
 		// niggli's test;
 		// --------------------------------------------------------------------------
-		IndexReader indexReader = IndexReader.open(index);
+		IndexReader indexReader = IndexReader.open(index0);
 		Terms terms = SlowCompositeReaderWrapper.wrap(indexReader)
 				.terms("text");
-		// System.out.println(terms.getSumTotalTermFreq());
+		System.out.println("before: " + terms.getSumTotalTermFreq());
+		TreeMap<String, Integer> treeMap = new TreeMap<String, Integer>();
 
+		HashMap<String, Integer> map = new HashMap<String, Integer>();
+		ValueComparator bvc = new ValueComparator(map);
+		TreeMap<String, Integer> sorted_map = new TreeMap<String, Integer>(bvc);
+
+		//init toDelete already with default StopWordList
+		List<String> toDelete = new ArrayList<String>(Arrays.asList(
+			      "a", "an", "and", "are", "as", "at", "be", "but", "by",
+			      "for", "if", "in", "into", "is", "it",
+			      "no", "not", "of", "on", "or", "such",
+			      "that", "the", "their", "then", "there", "these",
+			      "they", "this", "to", "was", "will", "with"
+			    ));
+		
 		TermsEnum termEnum = terms.iterator(null);
+		//int iTermCount = 0; 
 		while (termEnum.next() != null) {
+			//iTermCount++; 
 			BytesRef text = termEnum.term();
 			int freq = (int) termEnum.totalTermFreq();
-			int docFreq = (int) termEnum.docFreq();
-			System.out.println("Text:" + text.utf8ToString() + " Freq:" + freq
-					+ " DocFreq:" + docFreq);
+			// int docFreq = (int) termEnum.docFreq();
+			// System.out.println("Text:" + text.utf8ToString() + " Freq:" +
+			// freq
+			// + " DocFreq:" + docFreq);
+
+			if (text.utf8ToString().length() >= 2) {
+				map.put("" + text.utf8ToString(), freq);
+			} else {
+				// if smaller than 2 delete term
+				// System.out.println(text.utf8ToString());
+				// map.put("" + text.utf8ToString(), freq);
+				toDelete.add(text.utf8ToString());
+			}
 		}
 		indexReader.close();
+		
+		//add desired stuff to toDelete
+
+		sorted_map.putAll(map);
+		//System.out.println("TermCountBefore: "+ iTermCount);
+		System.out.println("Unsorted: " + map.size());
+		System.out.println("Sorted: " + sorted_map.size());
+		System.out.println("ToDelete: " + toDelete.size());
+
+
+		// write second Index
+		CharArraySet stopSet = new CharArraySet(Version.LUCENE_CURRENT, toDelete, false);
+		
+		StandardAnalyzer analyzer = new StandardAnalyzer(Version.LUCENE_42,
+				stopSet);
+		Directory index = new RAMDirectory();
+		IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_42,
+				analyzer);
+		IndexWriter w = new IndexWriter(index, config);
+		readXMLIntoIndexWriter(w, "data/irg_collection.xml");
+		w.close();
+
+		
+		IndexReader indexReader1 = IndexReader.open(index);
+		Terms terms1 = SlowCompositeReaderWrapper.wrap(indexReader1).terms(
+				"text");
+		System.out.println("after: " + terms1.getSumTotalTermFreq());
+		indexReader1.close();
+
 		// --------------------------------------------------------------------------
 		// --------------------------------------------------------------------------
 		// --------------------------------------------------------------------------
@@ -153,6 +217,33 @@ public class FancySearch_Niggli {
 			}
 		}
 
+	}
+
+	static <K, V extends Comparable<? super V>> SortedSet<Map.Entry<K, V>> entriesSortedByValues(
+			Map<K, V> map) {
+		SortedSet<Map.Entry<K, V>> sortedEntries = new TreeSet<Map.Entry<K, V>>(
+				new Comparator<Map.Entry<K, V>>() {
+					@Override
+					public int compare(Map.Entry<K, V> e1, Map.Entry<K, V> e2) {
+						return e1.getValue().compareTo(e2.getValue());
+					}
+				});
+		sortedEntries.addAll(map.entrySet());
+		return sortedEntries;
+	}
+
+	static <String, Integer extends Comparable<? super Integer>> SortedSet<Map.Entry<String, Integer>> entriesSortedByValues2(
+			Map<String, Integer> map) {
+		SortedSet<Map.Entry<String, Integer>> sortedEntries = new TreeSet<Map.Entry<String, Integer>>(
+				new Comparator<Map.Entry<String, Integer>>() {
+					@Override
+					public int compare(Map.Entry<String, Integer> e1,
+							Map.Entry<String, Integer> e2) {
+						return e1.getValue().compareTo(e2.getValue());
+					}
+				});
+		sortedEntries.addAll(map.entrySet());
+		return sortedEntries;
 	}
 
 	private static void readXMLIntoQueryArrays(String path) {
@@ -278,5 +369,23 @@ public class FancySearch_Niggli {
 		} catch (Throwable t) {
 			t.printStackTrace();
 		}
+	}
+}
+
+class ValueComparator implements Comparator<String> {
+	Map<String, Integer> base;
+
+	public ValueComparator(Map<String, Integer> base) {
+		this.base = base;
+	}
+
+	// Note: this comparator imposes orderings that are inconsistent with
+	// equals.
+	public int compare(String a, String b) {
+		if (base.get(a) >= base.get(b)) {
+			return -1;
+		} else {
+			return 1;
+		} // returning 0 would merge keys
 	}
 }
