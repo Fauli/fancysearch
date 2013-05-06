@@ -12,15 +12,12 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.SortedSet;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import org.apache.lucene.analysis.core.StopAnalyzer;
+import org.apache.lucene.analysis.snowball.SnowballAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.document.Document;
@@ -54,13 +51,15 @@ public class FancySearch_Niggli {
 
 	public static String[] queryNr = new String[50];
 	public static String[] queryText = new String[50];
-	public static String systemName = "fancySearch-master";
+	public static String systemName = "fancySearch-niggli";
 
 	public static void main(String[] args) throws IOException, ParseException {
 		// 0. Specify the analyzer for tokenizing text.
 		// The same analyzer should be used for indexing and searching
-		StandardAnalyzer analyzer0 = new StandardAnalyzer(Version.LUCENE_42);
-
+		//StandardAnalyzer analyzer0 = new StandardAnalyzer(Version.LUCENE_42);
+		@SuppressWarnings("deprecation")
+		SnowballAnalyzer analyzer0 = new SnowballAnalyzer(Version.LUCENE_42,"English");
+		
 		// 1. create the index
 		Directory index0 = new RAMDirectory();
 		// Directory index = FSDirectory.open(new
@@ -81,11 +80,12 @@ public class FancySearch_Niggli {
 		// --------------------------------------------------------------------------
 		// niggli's test;
 		// --------------------------------------------------------------------------
+		@SuppressWarnings("deprecation")
 		IndexReader indexReader = IndexReader.open(index0);
 		Terms terms = SlowCompositeReaderWrapper.wrap(indexReader)
 				.terms("text");
 		System.out.println("before: " + terms.getSumTotalTermFreq());
-		TreeMap<String, Integer> treeMap = new TreeMap<String, Integer>();
+		//TreeMap<String, Integer> treeMap = new TreeMap<String, Integer>();
 
 		HashMap<String, Integer> map = new HashMap<String, Integer>();
 		ValueComparator bvc = new ValueComparator(map);
@@ -132,10 +132,14 @@ public class FancySearch_Niggli {
 
 
 		// write second Index
+		@SuppressWarnings("deprecation")
 		CharArraySet stopSet = new CharArraySet(Version.LUCENE_CURRENT, toDelete, false);
 		
-		StandardAnalyzer analyzer = new StandardAnalyzer(Version.LUCENE_42,
-				stopSet);
+		
+		//StandardAnalyzer analyzer = new StandardAnalyzer(Version.LUCENE_42,stopSet);
+		@SuppressWarnings("deprecation")
+		SnowballAnalyzer analyzer = new SnowballAnalyzer(Version.LUCENE_42,"English",stopSet);
+		
 		Directory index = new RAMDirectory();
 		IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_42,
 				analyzer);
@@ -144,6 +148,7 @@ public class FancySearch_Niggli {
 		w.close();
 
 		
+		@SuppressWarnings("deprecation")
 		IndexReader indexReader1 = IndexReader.open(index);
 		Terms terms1 = SlowCompositeReaderWrapper.wrap(indexReader1).terms(
 				"text");
@@ -217,33 +222,6 @@ public class FancySearch_Niggli {
 			}
 		}
 
-	}
-
-	static <K, V extends Comparable<? super V>> SortedSet<Map.Entry<K, V>> entriesSortedByValues(
-			Map<K, V> map) {
-		SortedSet<Map.Entry<K, V>> sortedEntries = new TreeSet<Map.Entry<K, V>>(
-				new Comparator<Map.Entry<K, V>>() {
-					@Override
-					public int compare(Map.Entry<K, V> e1, Map.Entry<K, V> e2) {
-						return e1.getValue().compareTo(e2.getValue());
-					}
-				});
-		sortedEntries.addAll(map.entrySet());
-		return sortedEntries;
-	}
-
-	static <String, Integer extends Comparable<? super Integer>> SortedSet<Map.Entry<String, Integer>> entriesSortedByValues2(
-			Map<String, Integer> map) {
-		SortedSet<Map.Entry<String, Integer>> sortedEntries = new TreeSet<Map.Entry<String, Integer>>(
-				new Comparator<Map.Entry<String, Integer>>() {
-					@Override
-					public int compare(Map.Entry<String, Integer> e1,
-							Map.Entry<String, Integer> e2) {
-						return e1.getValue().compareTo(e2.getValue());
-					}
-				});
-		sortedEntries.addAll(map.entrySet());
-		return sortedEntries;
 	}
 
 	private static void readXMLIntoQueryArrays(String path) {
