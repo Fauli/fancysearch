@@ -48,6 +48,8 @@ public class FancySearch_Merne {
 	public static String systemName = "fancySearch-merne";
 	public static Map<String, String> cache = new HashMap<String, String>();
 	public static int lookups, cacheHits;
+	public static int summaryNewSize;
+	public static int summaryWordCount;
 
 	public static void main(String[] args) throws IOException, ParseException {
 
@@ -75,7 +77,7 @@ public class FancySearch_Merne {
 		// int queryNr = 1;
 
 		readXMLIntoQueryArrays("data/irg_queries.xml");
-		
+
 		System.setProperty("org.apache.lucene.maxClauseCount", "4096");
 		BooleanQuery.setMaxClauseCount(4096);
 
@@ -83,12 +85,11 @@ public class FancySearch_Merne {
 		System.out.println(". are lookups, + are cache hits");
 		for (int queryCounter = 0; queryCounter < 50; queryCounter++) {
 			// 2. query
-			System.out.print((queryCounter+1) + ": " + queryNr[queryCounter] + " ");
+			System.out.print((queryCounter + 1) + ": " + queryNr[queryCounter] + " ");
 			String querystr = convertToSlangWords(queryText[queryCounter].replaceAll("\"|\\n|/n", " "));
 			StringBuilder sb2 = new StringBuilder();
 			for (String tmp : querystr.split(" ", 1024))
-				sb2.append(tmp+ " ");
-			
+				sb2.append(tmp + " ");
 
 			// the "title" arg specifies the default field to use
 			// when no field is explicitly specified in the query.
@@ -104,7 +105,7 @@ public class FancySearch_Merne {
 			ScoreDoc[] hits = collector.topDocs().scoreDocs;
 
 			// 4. display results
-			System.out.println(".. done");
+			System.out.println(".. done, cache efficiency: " + (float)  cacheHits*100 / (lookups+cacheHits) + "%");
 
 			for (int i = 0; i < hits.length; ++i) {
 				int docId = hits[i].doc;
@@ -133,7 +134,8 @@ public class FancySearch_Merne {
 			} catch (Exception ex) {
 			}
 		}
-		System.out.println("Lookups: "+ lookups + " Cache hits: "+ cacheHits + "Ratio (L/CH) " + (float)lookups/cacheHits);
+		System.out.println("Lookups: " + lookups + " Cache hits: " + cacheHits + " Ratio (L/CH) " + (float) lookups / cacheHits);
+		System.out.println("Average word inflation: "+(float)summaryNewSize/summaryWordCount);
 
 	}
 
@@ -145,30 +147,28 @@ public class FancySearch_Merne {
 
 			for (String currentWord : words) {
 				if (!(currentWord.equals(""))) {
-				if (cache.get(currentWord) == null) {
-					lookups++;
-					URL getURL = new URL("http://www.urbandictionary.com/define.php?term=" + currentWord);
-					URLConnection connection = getURL.openConnection();
-					BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-					String input;
-					StringBuilder sb1 = new StringBuilder();
-					while (in.ready()) {
-						sb1.append(in.readLine());
+					if (cache.get(currentWord) == null) {
+						lookups++;
+						URL getURL = new URL("http://www.urbandictionary.com/define.php?term=" + currentWord);
+						URLConnection connection = getURL.openConnection();
+						BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+						String input;
+						StringBuilder sb1 = new StringBuilder();
+						while (in.ready()) {
+							sb1.append(in.readLine());
+						}
+						input = sb1.toString();
+						String slangWord = getSlangWord(input);
+						sb.append(slangWord + " ");
+						System.out.print(".");
+						cache.put(currentWord, slangWord);
+						summaryWordCount++;
+						summaryNewSize += slangWord.split(" ").length;
+					} else {
+						cacheHits++;
+						System.out.print("+");
+						sb.append(cache.get(currentWord));
 					}
-					input = sb1.toString();
-					String slangWord = getSlangWord(input);
-					sb.append(slangWord+ " ");
-					System.out.print(".");
-					// System.out.println("lookup " + currentWord + " = " +
-					// slangWord);
-					cache.put(currentWord, slangWord);
-				} else {
-					// System.out.println("cache hit for [" + currentWord +
-					// "]");
-					cacheHits++;
-					System.out.print("+");
-					sb.append(cache.get(currentWord));
-				}
 				}
 
 			}
@@ -177,20 +177,14 @@ public class FancySearch_Merne {
 			ex.printStackTrace();
 		}
 		return sb.toString();
-		
-
 	}
 
 	private static String getSlangWord(String html) {
 		String str = "";
 		try {
 			str = html.split("definition\">")[1].split("</div")[0].replaceAll("<.*?>", "").replaceAll(" +", " ");
-
-			// replace(")", " ").replace("("," ").replaceAll(
-			// "<br/>|<br />|\"|\\n|/n|=|<(.*?)>|/N|/|-", " ").trim().split(" ",
-			// 1024).toString();
 		} catch (Exception ex) {
-
+//			ex.printStackTrace();
 		}
 		return str;
 	}
