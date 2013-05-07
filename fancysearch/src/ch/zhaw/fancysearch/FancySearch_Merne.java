@@ -10,6 +10,8 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -43,6 +45,7 @@ public class FancySearch_Merne {
 	public static String[] queryNr = new String[50];
 	public static String[] queryText = new String[50];
 	public static String systemName = "fancySearch-merne";
+	public static Map<String, String> cache = new HashMap<String, String>();
 
 	public static void main(String[] args) throws IOException, ParseException {
 
@@ -82,7 +85,7 @@ public class FancySearch_Merne {
 			// the "title" arg specifies the default field to use
 			// when no field is explicitly specified in the query.
 			Query q = new QueryParser(Version.LUCENE_42, "text", analyzer)
-					.parse(querystr);
+					.parse(QueryParser.escape(querystr));
 
 			// 3. search
 			int hitsPerPage = 1000;
@@ -132,41 +135,51 @@ public class FancySearch_Merne {
 	}
 
 	private static String convertToSlangWords(String query) {
+		String[] words = query.split(" ");
+		StringBuilder sb = new StringBuilder();
+
 		try {
-			String[] words = query.split(" ");
-			StringBuilder sb = new StringBuilder();
+
 			for (String currentWord : words) {
-				URL getURL = new URL(
-						"http://www.urbandictionary.com/define.php?term="
-								+ currentWord);
-				URLConnection connection = getURL.openConnection();
-				BufferedReader in = new BufferedReader(new InputStreamReader(
-						connection.getInputStream()));
-				String input;
-				StringBuilder sb1 = new StringBuilder();
-				while (in.ready()) {
-					sb1.append(in.readLine());
+				if (cache.get(currentWord) == null) {
+					URL getURL = new URL(
+							"http://www.urbandictionary.com/define.php?term="
+									+ currentWord);
+					URLConnection connection = getURL.openConnection();
+					BufferedReader in = new BufferedReader(
+							new InputStreamReader(connection.getInputStream()));
+					String input;
+					StringBuilder sb1 = new StringBuilder();
+					while (in.ready()) {
+						sb1.append(in.readLine());
+					}
+					input = sb1.toString();
+					String slangWord = getSlangWord(input);
+					sb.append(slangWord);
+					System.out
+							.println("##################################################");
+					System.out.println("  " + currentWord + " = " + slangWord);
+					cache.put(currentWord, slangWord);
+				} else {
+					System.out.println("cache hit for " + currentWord);
+					sb.append(cache.get(currentWord));
 				}
-				input = sb1.toString();
-				sb.append(getSlangWord(input));
-				System.out
-						.println("##################################################");
-				System.out.println("  " + currentWord + " = " + getSlangWord(input));
 
 			}
 
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
-		return query;
+		return sb.toString();
 
 	}
 
 	private static String getSlangWord(String html) {
 		String str = "";
 		try {
-			str = html.split("definition\">")[1].split("</div")[0].replaceAll(
-					"<br/>|<br />|\"|\\n|/n|=|<(.*?)>", " ");
+			str = html.split("definition\">")[1].split("</div")[0].replaceAll("<.*?>", " ").replaceAll(" +", " ");
+					
+//					replace(")", " ").replace("("," ").replaceAll(					"<br/>|<br />|\"|\\n|/n|=|<(.*?)>|/N|/|-", " ").trim().split(" ", 1024).toString();
 		} catch (Exception ex) {
 
 		}
