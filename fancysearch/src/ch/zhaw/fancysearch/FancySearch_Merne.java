@@ -27,6 +27,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
@@ -46,6 +47,7 @@ public class FancySearch_Merne {
 	public static String[] queryText = new String[50];
 	public static String systemName = "fancySearch-merne";
 	public static Map<String, String> cache = new HashMap<String, String>();
+	public static int lookups, cacheHits;
 
 	public static void main(String[] args) throws IOException, ParseException {
 
@@ -56,8 +58,7 @@ public class FancySearch_Merne {
 		// 1. create the index
 		Directory index = new RAMDirectory();
 
-		IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_42,
-				analyzer);
+		IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_42, analyzer);
 
 		IndexWriter w = new IndexWriter(index, config);
 
@@ -74,37 +75,41 @@ public class FancySearch_Merne {
 		// int queryNr = 1;
 
 		readXMLIntoQueryArrays("data/irg_queries.xml");
+		
+		System.setProperty("org.apache.lucene.maxClauseCount", "4096");
+		BooleanQuery.setMaxClauseCount(4096);
 
 		StringBuilder sb = new StringBuilder();
-
+		System.out.println(". are lookups, + are cache hits");
 		for (int queryCounter = 0; queryCounter < 50; queryCounter++) {
 			// 2. query
-			String querystr = convertToSlangWords(queryText[queryCounter]
-					.replaceAll("\"|\\n|/n", " "));
+			System.out.print((queryCounter+1) + ": " + queryNr[queryCounter] + " ");
+			String querystr = convertToSlangWords(queryText[queryCounter].replaceAll("\"|\\n|/n", " "));
+			StringBuilder sb2 = new StringBuilder();
+			for (String tmp : querystr.split(" ", 1024))
+				sb2.append(tmp+ " ");
+			
 
 			// the "title" arg specifies the default field to use
 			// when no field is explicitly specified in the query.
-			Query q = new QueryParser(Version.LUCENE_42, "text", analyzer)
-					.parse(QueryParser.escape(querystr));
+			cache.put("", "");
+			Query q = new QueryParser(Version.LUCENE_42, "text", analyzer).parse(QueryParser.escape(sb2.toString()));
 
 			// 3. search
 			int hitsPerPage = 1000;
 			IndexReader reader = DirectoryReader.open(index);
 			IndexSearcher searcher = new IndexSearcher(reader);
-			TopScoreDocCollector collector = TopScoreDocCollector.create(
-					hitsPerPage, true);
+			TopScoreDocCollector collector = TopScoreDocCollector.create(hitsPerPage, true);
 			searcher.search(q, collector);
 			ScoreDoc[] hits = collector.topDocs().scoreDocs;
 
 			// 4. display results
-			System.out.println(".. done with query " + queryNr[queryCounter]);
+			System.out.println(".. done");
 
 			for (int i = 0; i < hits.length; ++i) {
 				int docId = hits[i].doc;
 				Document d = searcher.doc(docId);
-				sb.append(queryNr[queryCounter] + " " + "Q0 "
-						+ d.get("recordId") + " " + (i + 1) + " "
-						+ hits[i].score + " " + systemName + "\n");
+				sb.append(queryNr[queryCounter] + " " + "Q0 " + d.get("recordId") + " " + (i + 1) + " " + hits[i].score + " " + systemName + "\n");
 
 			}
 
@@ -117,9 +122,7 @@ public class FancySearch_Merne {
 		Writer writer = null;
 
 		try {
-			writer = new BufferedWriter(new OutputStreamWriter(
-					new FileOutputStream("data/output/" + systemName + ".txt"),
-					"utf-8"));
+			writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("data/output/" + systemName + ".txt"), "utf-8"));
 			writer.write(sb.toString());
 		} catch (IOException ex) {
 			// report
@@ -130,7 +133,7 @@ public class FancySearch_Merne {
 			} catch (Exception ex) {
 			}
 		}
-		System.out.println("... all done :-)");
+		System.out.println("Lookups: "+ lookups + " Cache hits: "+ cacheHits + "Ratio (L/CH) " + (float)lookups/cacheHits);
 
 	}
 
@@ -141,13 +144,12 @@ public class FancySearch_Merne {
 		try {
 
 			for (String currentWord : words) {
+				if (!(currentWord.equals(""))) {
 				if (cache.get(currentWord) == null) {
-					URL getURL = new URL(
-							"http://www.urbandictionary.com/define.php?term="
-									+ currentWord);
+					lookups++;
+					URL getURL = new URL("http://www.urbandictionary.com/define.php?term=" + currentWord);
 					URLConnection connection = getURL.openConnection();
-					BufferedReader in = new BufferedReader(
-							new InputStreamReader(connection.getInputStream()));
+					BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
 					String input;
 					StringBuilder sb1 = new StringBuilder();
 					while (in.ready()) {
@@ -155,14 +157,18 @@ public class FancySearch_Merne {
 					}
 					input = sb1.toString();
 					String slangWord = getSlangWord(input);
-					sb.append(slangWord);
-					System.out
-							.println("##################################################");
-					System.out.println("  " + currentWord + " = " + slangWord);
+					sb.append(slangWord+ " ");
+					System.out.print(".");
+					// System.out.println("lookup " + currentWord + " = " +
+					// slangWord);
 					cache.put(currentWord, slangWord);
 				} else {
-					System.out.println("cache hit for " + currentWord);
+					// System.out.println("cache hit for [" + currentWord +
+					// "]");
+					cacheHits++;
+					System.out.print("+");
 					sb.append(cache.get(currentWord));
+				}
 				}
 
 			}
@@ -171,15 +177,18 @@ public class FancySearch_Merne {
 			ex.printStackTrace();
 		}
 		return sb.toString();
+		
 
 	}
 
 	private static String getSlangWord(String html) {
 		String str = "";
 		try {
-			str = html.split("definition\">")[1].split("</div")[0].replaceAll("<.*?>", " ").replaceAll(" +", " ");
-					
-//					replace(")", " ").replace("("," ").replaceAll(					"<br/>|<br />|\"|\\n|/n|=|<(.*?)>|/N|/|-", " ").trim().split(" ", 1024).toString();
+			str = html.split("definition\">")[1].split("</div")[0].replaceAll("<.*?>", "").replaceAll(" +", " ");
+
+			// replace(")", " ").replace("("," ").replaceAll(
+			// "<br/>|<br />|\"|\\n|/n|=|<(.*?)>|/N|/|-", " ").trim().split(" ",
+			// 1024).toString();
 		} catch (Exception ex) {
 
 		}
@@ -190,8 +199,7 @@ public class FancySearch_Merne {
 
 		try {
 
-			DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory
-					.newInstance();
+			DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
 			DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
 			org.w3c.dom.Document doc = docBuilder.parse(new File(path));
 
@@ -211,30 +219,25 @@ public class FancySearch_Merne {
 					Element firstDOCElement = (Element) firstDOCNode;
 
 					// -------
-					NodeList recordIDList = firstDOCElement
-							.getElementsByTagName("recordId");
+					NodeList recordIDList = firstDOCElement.getElementsByTagName("recordId");
 					Element recordIDElement = (Element) recordIDList.item(0);
 
 					NodeList textrIDList = recordIDElement.getChildNodes();
-					queryNr[s] = ((Node) textrIDList.item(0)).getNodeValue()
-							.trim();
+					queryNr[s] = ((Node) textrIDList.item(0)).getNodeValue().trim();
 
 					// -------
-					NodeList textList = firstDOCElement
-							.getElementsByTagName("text");
+					NodeList textList = firstDOCElement.getElementsByTagName("text");
 					Element textElement = (Element) textList.item(0);
 
 					NodeList textTextList = textElement.getChildNodes();
-					queryText[s] = ((Node) textTextList.item(0)).getNodeValue()
-							.trim();
+					queryText[s] = ((Node) textTextList.item(0)).getNodeValue().trim();
 
 				}
 
 			}
 
 		} catch (SAXParseException err) {
-			System.out.println("** Parsing error" + ", line "
-					+ err.getLineNumber() + ", uri " + err.getSystemId());
+			System.out.println("** Parsing error" + ", line " + err.getLineNumber() + ", uri " + err.getSystemId());
 			System.out.println(" " + err.getMessage());
 
 		} catch (SAXException e) {
@@ -249,8 +252,7 @@ public class FancySearch_Merne {
 	private static void readXMLIntoIndexWriter(IndexWriter w, String path) {
 		try {
 
-			DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory
-					.newInstance();
+			DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
 			DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
 			org.w3c.dom.Document doc = docBuilder.parse(new File(path));
 
@@ -270,26 +272,19 @@ public class FancySearch_Merne {
 					Element firstDOCElement = (Element) firstDOCNode;
 
 					// -------
-					NodeList recordIDList = firstDOCElement
-							.getElementsByTagName("recordId");
+					NodeList recordIDList = firstDOCElement.getElementsByTagName("recordId");
 					Element recordIDElement = (Element) recordIDList.item(0);
 
 					NodeList textrIDList = recordIDElement.getChildNodes();
-					documentToAdd.add(new StringField("recordId",
-							((Node) textrIDList.item(0)).getNodeValue().trim(),
-							Field.Store.YES));
+					documentToAdd.add(new StringField("recordId", ((Node) textrIDList.item(0)).getNodeValue().trim(), Field.Store.YES));
 
 					// -------
-					NodeList textList = firstDOCElement
-							.getElementsByTagName("text");
+					NodeList textList = firstDOCElement.getElementsByTagName("text");
 					Element textElement = (Element) textList.item(0);
 
 					NodeList textTextList = textElement.getChildNodes();
 
-					documentToAdd
-							.add(new TextField("text", ((Node) textTextList
-									.item(0)).getNodeValue().trim(),
-									Field.Store.YES));
+					documentToAdd.add(new TextField("text", ((Node) textTextList.item(0)).getNodeValue().trim(), Field.Store.YES));
 
 					w.addDocument(documentToAdd);
 
@@ -298,8 +293,7 @@ public class FancySearch_Merne {
 			}
 
 		} catch (SAXParseException err) {
-			System.out.println("** Parsing error" + ", line "
-					+ err.getLineNumber() + ", uri " + err.getSystemId());
+			System.out.println("** Parsing error" + ", line " + err.getLineNumber() + ", uri " + err.getSystemId());
 			System.out.println(" " + err.getMessage());
 
 		} catch (SAXException e) {
