@@ -239,6 +239,7 @@ public class FancySearch_Niggli {
 			} catch (Exception ex) {
 			}
 		}
+		System.out.println("... all done :-)");
 
 	}
 

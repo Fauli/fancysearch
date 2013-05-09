@@ -114,7 +114,7 @@ public class FancySearch {
 			} catch (Exception ex) {
 			}
 		}
-
+		System.out.println("... all done :-)");
 	}
 
 	private static void readXMLIntoQueryArrays(String path) {
