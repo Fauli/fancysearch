@@ -18,7 +18,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.lucene.analysis.snowball.SnowballAnalyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
@@ -78,19 +77,27 @@ public class FancySearch_Niggli {
 		// Index written
 
 		// --------------------------------------------------------------------------
-		// niggli's test;
+		// niggli's test; - Snowball 
 		// --------------------------------------------------------------------------
+		// I know it's ugly but so waht
 		@SuppressWarnings("deprecation")
 		IndexReader indexReader = IndexReader.open(index0);
 		Terms terms = SlowCompositeReaderWrapper.wrap(indexReader)
 				.terms("text");
 		System.out.println("before: " + terms.getSumTotalTermFreq());
 		//TreeMap<String, Integer> treeMap = new TreeMap<String, Integer>();
+		TermsEnum termEnum0 = terms.iterator(null);
+		int total = 0; 
+		while (termEnum0.next() != null) {
+			total++; 
+		}
+		System.out.println("Terms in Index Before: " + total);
+		total = total / 5 ;
 
 		HashMap<String, Integer> map = new HashMap<String, Integer>();
 		ValueComparator bvc = new ValueComparator(map);
 		TreeMap<String, Integer> sorted_map = new TreeMap<String, Integer>(bvc);
-
+		
 		//init toDelete already with default StopWordList
 		List<String> toDelete = new ArrayList<String>(Arrays.asList(
 			      "a", "an", "and", "are", "as", "at", "be", "but", "by",
@@ -101,9 +108,9 @@ public class FancySearch_Niggli {
 			    ));
 		
 		TermsEnum termEnum = terms.iterator(null);
-		//int iTermCount = 0; 
+		int iTermCount = 0; 
 		while (termEnum.next() != null) {
-			//iTermCount++; 
+			iTermCount++; 
 			BytesRef text = termEnum.term();
 			int freq = (int) termEnum.totalTermFreq();
 			// int docFreq = (int) termEnum.docFreq();
@@ -111,8 +118,16 @@ public class FancySearch_Niggli {
 			// freq
 			// + " DocFreq:" + docFreq);
 
-			if (text.utf8ToString().length() >= 2) {
-				map.put("" + text.utf8ToString(), freq);
+			if (text.utf8ToString().length() >= 2 ) {
+				if (iTermCount > (total * 2)){
+					if (iTermCount < (total * 3)){
+						toDelete.add(text.utf8ToString());
+					} else {
+						map.put("" + text.utf8ToString(), freq);
+					}
+				} else {
+					map.put("" + text.utf8ToString(), freq);
+				}
 			} else {
 				// if smaller than 2 delete term
 				// System.out.println(text.utf8ToString());
@@ -123,9 +138,11 @@ public class FancySearch_Niggli {
 		indexReader.close();
 		
 		//add desired stuff to toDelete
+		
 
 		sorted_map.putAll(map);
 		//System.out.println("TermCountBefore: "+ iTermCount);
+		System.out.println("Total: " + total);
 		System.out.println("Unsorted: " + map.size());
 		System.out.println("Sorted: " + sorted_map.size());
 		System.out.println("ToDelete: " + toDelete.size());
